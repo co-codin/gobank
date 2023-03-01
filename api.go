@@ -12,7 +12,7 @@ type apiFunc func(http.ResponseWriter, *http.Request) error
 
 func WriteJSON(w http.ResponseWriter, status int, v any) error {
 	w.WriteHeader(status)
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Add("Content-Type", "application/json")
 	return json.NewEncoder(w).Encode(v)
 }
 
@@ -40,7 +40,10 @@ func NewAPIServer(listenAddr string) *APIServer {
 
 func (s *APIServer) Run() {
 	router := mux.NewRouter()
+
 	router.HandleFunc("/account", makeHTTPHandleFunc(s.handleAccount))
+
+	router.HandleFunc("/account/{id}", makeHTTPHandleFunc(s.handleAccount))
 
 	log.Println("JSON API server running on port: ", s.listenAddr)
 
@@ -61,7 +64,9 @@ func (s *APIServer) handleAccount(w http.ResponseWriter, r *http.Request) error 
 }
 
 func (s *APIServer) handleGetAccount(w http.ResponseWriter, r *http.Request) error {
-	return nil
+	id := mux.Vars(r)["id"]
+
+	return WriteJSON(w, http.StatusOK, id)
 }
 
 func (s *APIServer) handleCreateAccount(w http.ResponseWriter, r *http.Request) error {
