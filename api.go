@@ -54,7 +54,19 @@ func (s *APIServer) handleGetAccount(w http.ResponseWriter, r *http.Request) err
 }
 
 func (s *APIServer) handleCreateAccount(w http.ResponseWriter, r *http.Request) error {
-	return nil
+	CreateAccountRequest := CreateAccountRequest{}
+
+	if err := json.NewDecoder(r.Body).Decode(&CreateAccountRequest); err != nil {
+		return err
+	}
+
+	account := NewAccount(CreateAccountRequest.FirstName, CreateAccountRequest.LastName)
+
+	if err := s.storage.CreateAccount(account); err != nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusOK, account)
 }
 
 func (s *APIServer) handleDeleteAccount(w http.ResponseWriter, r *http.Request) error {
