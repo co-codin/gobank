@@ -8,8 +8,9 @@ import (
 type Storage interface {
 	CreateAccount(*Account) error
 	DeleteAccount(int) error
-	UpdateAccount(*Account) error
+	GetAccounts() ([]*Account, error)
 	GetAccountByID(int) (*Account, error)
+	GetAccountByNumber(int) (*Account, error)
 }
 
 type PostgresStorage struct {
@@ -79,6 +80,43 @@ func (s *PostgresStorage) DeleteAccount(id int) error {
 	return nil
 }
 
+func (s *PostgresStorage) GetAccounts() ([]*Account, error) {
+	rows, err := s.db.Query("select * from accounts")
+	if err != nil {
+		return nil, err
+	}
+	accounts := []*Account{}
+
+	for rows.Next() {
+		account, err := scanIntoAccount(rows)
+		if err != nil {
+			return nil, err
+		}
+		accounts = append(accounts, account)
+	}
+
+	return accounts, nil
+}
+
 func (s *PostgresStorage) GetAccountByID(id int) (*Account, error) {
 	return &Account{}, nil
+}
+
+func GetAccountByNumber(number int) (*Account, error) {
+	return nil, nil
+}
+
+func scanIntoAccount(rows *sql.Rows) (*Account, error) {
+	account := new(Account)
+
+	err := rows.Scan(
+		&account.ID,
+		&account.FirstName,
+		&account.LastName,
+		&account.Number,
+		&account.Balance,
+		&account.CreatedAt,
+	)
+
+	return account, err
 }
