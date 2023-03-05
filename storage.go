@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	_ "github.com/lib/pq"
 )
 
@@ -99,10 +100,20 @@ func (s *PostgresStorage) GetAccounts() ([]*Account, error) {
 }
 
 func (s *PostgresStorage) GetAccountByID(id int) (*Account, error) {
-	return &Account{}, nil
+	rows, err := s.db.Query("select from accounts where id = $1", id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		return scanIntoAccount(rows)
+	}
+
+	return nil, fmt.Errorf("Account %d not found", id)
 }
 
-func GetAccountByNumber(number int) (*Account, error) {
+func (s *PostgresStorage) GetAccountByNumber(number int) (*Account, error) {
 	return nil, nil
 }
 
