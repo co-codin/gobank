@@ -3,42 +3,45 @@ package main
 import (
 	"database/sql"
 	"fmt"
+
 	_ "github.com/lib/pq"
 )
 
 type Storage interface {
 	CreateAccount(*Account) error
 	DeleteAccount(int) error
+	UpdateAccount(*Account) error
 	GetAccounts() ([]*Account, error)
 	GetAccountByID(int) (*Account, error)
 	GetAccountByNumber(int) (*Account, error)
 }
 
-type PostgresStorage struct {
+type PostgresStore struct {
 	db *sql.DB
 }
 
-func NewPostgresStore() (*PostgresStorage, error) {
-	connStr := "user=postgres dbname=gobank password=root sslmode=disable"
+func NewPostgresStore() (*PostgresStore, error) {
+	connStr := "user=postgres dbname=postgres password=gobank sslmode=disable"
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		return nil, err
 	}
+
 	if err := db.Ping(); err != nil {
 		return nil, err
 	}
 
-	return &PostgresStorage{
+	return &PostgresStore{
 		db: db,
 	}, nil
 }
 
-func (s *PostgresStorage) Init() error {
+func (s *PostgresStore) Init() error {
 	return s.createAccountTable()
 }
 
-func (s *PostgresStorage) createAccountTable() error {
-	query := `create table if not exists accounts (
+func (s *PostgresStore) createAccountTable() error {
+	query := `create table if not exists account (
 		id serial primary key,
 		first_name varchar(100),
 		last_name varchar(100),
@@ -49,22 +52,22 @@ func (s *PostgresStorage) createAccountTable() error {
 	)`
 
 	_, err := s.db.Exec(query)
-
 	return err
 }
 
-func (s *PostgresStorage) CreateAccount(account *Account) error {
+func (s *PostgresStore) CreateAccount(acc *Account) error {
 	query := `insert into account 
 	(first_name, last_name, number, encrypted_password, balance, created_at)
 	values ($1, $2, $3, $4, $5, $6)`
 
 	_, err := s.db.Query(
 		query,
-		account.FirstName,
-		account.LastName,
-		account.Number,
-		account.Balance,
-		account.CreatedAt)
+		acc.FirstName,
+		acc.LastName,
+		acc.Number,
+		acc.EncryptedPassword,
+		acc.Balance,
+		acc.CreatedAt)
 
 	if err != nil {
 		return err
@@ -73,21 +76,48 @@ func (s *PostgresStorage) CreateAccount(account *Account) error {
 	return nil
 }
 
-func (s *PostgresStorage) UpdateAccount(account *Account) error {
+func (s *PostgresStore) UpdateAccount(*Account) error {
 	return nil
 }
 
-func (s *PostgresStorage) DeleteAccount(id int) error {
-	return nil
+func (s *PostgresStore) DeleteAccount(id int) error {
+	_, err := s.db.Query("delete from account where id = $1", id)
+	return err
 }
 
-func (s *PostgresStorage) GetAccounts() ([]*Account, error) {
-	rows, err := s.db.Query("select * from accounts")
+func (s *PostgresStore) GetAccountByNumber(number int) (*Account, error) {
+	rows, err := s.db.Query("select * from account where number = $1", number)
 	if err != nil {
 		return nil, err
 	}
-	accounts := []*Account{}
 
+	for rows.Next() {
+		return scanIntoAccount(rows)
+	}
+
+	return nil, fmt.Errorf("account with number [%d] not found", number)
+}
+
+func (s *PostgresStore) GetAccountByID(id int) (*Account, error) {
+	rows, err := s.db.Query("select * from account where id = $1", id)
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		return scanIntoAccount(rows)
+	}
+
+	return nil, fmt.Errorf("account %d not found", id)
+}
+
+func (s *PostgresStore) GetAccounts() ([]*Account, error) {
+	rows, err := s.db.Query("select * from account")
+	if err != nil {
+		return nil, err
+	}
+
+	accounts := []*Account{}
 	for rows.Next() {
 		account, err := scanIntoAccount(rows)
 		if err != nil {
@@ -99,35 +129,16 @@ func (s *PostgresStorage) GetAccounts() ([]*Account, error) {
 	return accounts, nil
 }
 
-func (s *PostgresStorage) GetAccountByID(id int) (*Account, error) {
-	rows, err := s.db.Query("select from accounts where id = $1", id)
-
-	if err != nil {
-		return nil, err
-	}
-
-	for rows.Next() {
-		return scanIntoAccount(rows)
-	}
-
-	return nil, fmt.Errorf("Account %d not found", id)
-}
-
-func (s *PostgresStorage) GetAccountByNumber(number int) (*Account, error) {
-	return nil, nil
-}
-
 func scanIntoAccount(rows *sql.Rows) (*Account, error) {
 	account := new(Account)
-
 	err := rows.Scan(
 		&account.ID,
 		&account.FirstName,
 		&account.LastName,
 		&account.Number,
+		&account.EncryptedPassword,
 		&account.Balance,
-		&account.CreatedAt,
-	)
+		&account.CreatedAt)
 
 	return account, err
 }
